@@ -1,20 +1,70 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Blog GEXPLO · Base editorial de producción (incremental)
 
-# Run and deploy your AI Studio app
+Plataforma editorial propia para `blog.gexplo.com` con:
+- Frontend público (Home, archivo, post individual, sobre el blog).
+- Admin privado para crear/editar/publicar/despublicar.
+- Sesión segura con cookie HttpOnly.
+- Upload de imagen destacada.
+- Persistencia en base de datos real (`SQLite` local con esquema relacional).
 
-This contains everything you need to run your app locally.
+> ⚠️ Restricción del entorno actual: `npm` está bloqueado para instalar dependencias como `prisma`, `@prisma/client` o `pg`; por eso esta iteración no pudo implementar PostgreSQL+Prisma todavía. Se dejó la base preparada para migración inmediata cuando el registro npm esté habilitado.
 
-View your app in AI Studio: https://ai.studio/apps/f279c7f8-0ec0-4ea9-b7cb-b6404e3328a1
+---
 
-## Run Locally
+## 1) Instalación local
 
-**Prerequisites:**  Node.js
+```bash
+npm install
+cp .env.example .env
+npm run seed
+npm run dev:api
+# en otra terminal
+npm run dev
+```
 
+- Frontend: `http://localhost:3000`
+- API: `http://localhost:4000`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 2) Variables de entorno
+
+- `ADMIN_EMAIL`: usuario admin.
+- `ADMIN_PASSWORD`: contraseña admin.
+- `BLOG_PUBLIC_URL`: URL final del blog (ej. `https://blog.gexplo.com`).
+
+## 3) Deploy (VPS / contenedor)
+
+### Build
+```bash
+npm run build
+```
+
+### Runtime recomendado
+1. Levantar API (`npm run dev:api`) detrás de un process manager (`pm2` o systemd).
+2. Servir frontend estático con `npm run preview` o Nginx.
+3. Configurar reverse proxy:
+   - `blog.gexplo.com` → frontend
+   - `/api` → backend puerto `4000`
+
+### Nginx (esqueleto)
+```nginx
+server {
+  server_name blog.gexplo.com;
+  location /api/ {
+    proxy_pass http://127.0.0.1:4000/;
+  }
+  location / {
+    proxy_pass http://127.0.0.1:3000/;
+  }
+}
+```
+
+## 4) SEO básico implementado
+- Título por post (`document.title`).
+- Meta description por post (idea clave).
+- Slug editorial legible.
+
+## 5) Roadmap inmediato para cerrar requerimiento PostgreSQL + Prisma
+1. Habilitar npm registry para instalar `prisma`, `@prisma/client`, `pg`.
+2. Migrar tabla `posts` + `sessions` a PostgreSQL.
+3. Sustituir SQL actual por Prisma Client.
+4. Mantener misma API (sin romper frontend).
