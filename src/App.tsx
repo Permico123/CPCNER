@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-type PostStatus = "DRAFT" | "PUBLISHED";
-
 type Post = {
   id: number;
   title: string;
@@ -12,15 +10,11 @@ type Post = {
   coverImage: string;
   tags: string;
   weekNumber?: number;
-  status: PostStatus;
+  status: "DRAFT" | "PUBLISHED";
   publishedAt?: string;
 };
 
-type Toast = { type: "success" | "error"; message: string; post?: Post } | null;
-
-const editorialTitle = "De consultora ambiental a empresa tecnológica basada en datos";
-const editorialSubtitle =
-  "Documentación semanal de decisiones, aprendizajes y evolución real de GEXPLO";
+const intro = "Bitácora técnica de GEXPLO: transición desde consultoría ambiental e hidrogeológica hacia una operación geocientífica basada en datos, trazabilidad e IA aplicada.";
 
 const emptyPost: Partial<Post> = {
   title: "",
@@ -29,7 +23,7 @@ const emptyPost: Partial<Post> = {
   keyIdea: "",
   content: "",
   coverImage: "",
-  tags: "ambiente,agua,tierra",
+  tags: "ambiente,agua",
   weekNumber: 1,
   status: "DRAFT"
 };
@@ -38,17 +32,8 @@ export function App() {
   const [path, setPath] = useState(window.location.pathname);
   const [posts, setPosts] = useState([] as Post[]);
 
-  const refreshPublicPosts = async () => {
-    const response = await fetch("/api/posts");
-    const data = await response.json();
-    setPosts(data);
-  };
-
   useEffect(() => {
-    refreshPublicPosts();
-    const onPop = () => setPath(window.location.pathname);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    fetch("/api/posts").then((r) => r.json()).then(setPosts);
   }, []);
 
   const activeSlug = useMemo(() => path.match(/^\/articulos\/(.+)$/)?.[1], [path]);
@@ -57,26 +42,23 @@ export function App() {
   useEffect(() => {
     if (!current) {
       document.title = "Blog GEXPLO";
-      setMeta("description", editorialSubtitle);
       return;
     }
-
     document.title = `${current.title} | Blog GEXPLO`;
     setMeta("description", current.keyIdea);
   }, [current]);
 
-  const go = (to: string) => {
+  function go(to: string) {
     window.history.pushState({}, "", to);
     setPath(to);
-  };
+  }
 
   return (
     <div>
       <header className="header">
         <div className="container nav">
-          <button className="brand" onClick={() => go("/")}>GEXPLO · Editorial</button>
+          <button className="brand" onClick={() => go("/")}>GEXPLO · Blog</button>
           <nav>
-            <button onClick={() => go("/")}>Inicio</button>
             <button onClick={() => go("/articulos")}>Artículos</button>
             <button onClick={() => go("/sobre")}>Sobre este blog</button>
             <button onClick={() => go("/admin")}>Admin</button>
@@ -89,12 +71,7 @@ export function App() {
         {path === "/articulos" && <Archive posts={posts} go={go} />}
         {path.startsWith("/articulos/") && current && <Article post={current} />}
         {path === "/sobre" && <About />}
-        {path === "/admin" && (
-          <Admin
-            go={go}
-            onPublicDataChange={refreshPublicPosts}
-          />
-        )}
+        {path === "/admin" && <Admin onUpdated={() => fetch("/api/posts").then((r) => r.json()).then(setPosts)} />}
       </main>
     </div>
   );
@@ -102,59 +79,40 @@ export function App() {
 
 function Home({ posts, go }: { posts: Post[]; go: (to: string) => void }) {
   return (
-    <section className="stack-lg">
+    <section>
       <div className="hero">
-        <div className="hero-badge">Bitácora del CEO</div>
-        <h1>{editorialTitle}</h1>
-        <p className="hero-subtitle">{editorialSubtitle}</p>
-        <p className="muted">
-          Ambiente, Agua, Tierra e IA & Blockchain en una narrativa de transformación real, semanal y verificable.
-        </p>
+        <p className="eyebrow">Ambiente · Agua · Tierra · IA & Blockchain</p>
+        <h1>Documentación semanal de la transformación de GEXPLO.</h1>
+        <p>{intro}</p>
       </div>
-
-      <div className="section-head">
-        <h2>Últimas ediciones</h2>
-        <button onClick={() => go("/articulos")}>Ver archivo completo</button>
-      </div>
-
-      <div className="card-grid">
-        {posts.slice(0, 6).map((post) => (
-          <div key={post.id}><PostCard post={post} go={go} /></div>
-        ))}
-      </div>
+      <h2>Últimas ediciones</h2>
+      {posts.slice(0, 3).map((post) => (
+        <div key={post.id}><PostCard post={post} go={go} /></div>
+      ))}
     </section>
   );
 }
 
 function Archive({ posts, go }: { posts: Post[]; go: (to: string) => void }) {
   return (
-    <section className="stack-md">
+    <section>
       <h1>Archivo editorial</h1>
-      <p className="muted">Seguimiento semanal de estrategia, operaciones y evolución de producto.</p>
-      <div className="card-grid">
-        {posts.map((post) => (
-          <div key={post.id}><PostCard post={post} go={go} /></div>
-        ))}
-      </div>
+      <p className="muted">Seguimiento de estrategia, operaciones y producto.</p>
+      {posts.map((post) => (
+        <div key={post.id}><PostCard post={post} go={go} /></div>
+      ))}
     </section>
   );
 }
 
 function PostCard({ post, go }: { post: Post; go: (to: string) => void }) {
   return (
-    <article className="post-card">
+    <article className="card">
       {post.coverImage && <img src={post.coverImage} alt={post.title} />}
-      <div className="post-body">
-        <p className="micro">Semana {post.weekNumber ?? "-"}</p>
-        <h3>{post.title}</h3>
-        <p>{post.keyIdea}</p>
-        <div className="tag-row">
-          {splitTags(post.tags).slice(0, 3).map((tag) => (
-            <span key={tag} className="tag">{tag}</span>
-          ))}
-        </div>
-        <button onClick={() => go(`/articulos/${post.slug}`)}>Leer artículo</button>
-      </div>
+      <p className="muted">Semana {post.weekNumber ?? "-"}</p>
+      <h3>{post.title}</h3>
+      <p>{post.keyIdea}</p>
+      <button onClick={() => go(`/articulos/${post.slug}`)}>Leer artículo</button>
     </article>
   );
 }
@@ -162,282 +120,145 @@ function PostCard({ post, go }: { post: Post; go: (to: string) => void }) {
 function Article({ post }: { post: Post }) {
   return (
     <article className="article">
-      <p className="micro">Semana {post.weekNumber ?? "-"}</p>
       <h1>{post.title}</h1>
-      {post.subtitle && <p className="article-subtitle">{post.subtitle}</p>}
+      {post.subtitle && <p className="muted">{post.subtitle}</p>}
       {post.coverImage && <img src={post.coverImage} alt={post.title} />}
-
       <blockquote>{post.keyIdea}</blockquote>
-
-      <div className="article-content">
-        {post.content.split("\n\n").map((block, index) =>
-          block.startsWith("## ") ? <h2 key={index}>{block.slice(3)}</h2> : <p key={index}>{block}</p>
-        )}
-      </div>
-
-      <div className="tag-row">
-        {splitTags(post.tags).map((tag) => (
-          <span key={tag} className="tag">{tag}</span>
-        ))}
-      </div>
+      {post.content.split("\n\n").map((block, index) =>
+        block.startsWith("## ") ? <h2 key={index}>{block.slice(3)}</h2> : <p key={index}>{block}</p>
+      )}
+      <p className="muted">Tags: {post.tags}</p>
     </article>
   );
 }
 
 function About() {
   return (
-    <section className="stack-md">
+    <section>
       <h1>Sobre este blog</h1>
-      <p>{editorialTitle}</p>
-      <p>{editorialSubtitle}</p>
-      <p className="muted">
-        Este espacio no funciona como un blog técnico tradicional: es una capa editorial de decisiones reales para construir trazabilidad estratégica.
-      </p>
+      <p>{intro}</p>
+      <p>Este espacio editorial busca trazabilidad, criterio técnico y continuidad estratégica.</p>
     </section>
   );
 }
 
-function Admin({
-  onPublicDataChange,
-  go
-}: {
-  onPublicDataChange: () => Promise<void>;
-  go: (to: string) => void;
-}) {
+function Admin({ onUpdated }: { onUpdated: () => void }) {
   const [auth, setAuth] = useState(false);
-  const [loadingList, setLoadingList] = useState(false);
   const [posts, setPosts] = useState([] as Post[]);
   const [editing, setEditing] = useState(emptyPost as Partial<Post>);
-  const [saving, setSaving] = useState(null as "DRAFT" | "PUBLISHED" | null);
-  const [uploading, setUploading] = useState(false);
-  const [toast, setToast] = useState(null as Toast);
 
-  const refreshAdmin = async () => {
-    setLoadingList(true);
+  async function refreshAdmin() {
     const response = await fetch("/api/admin/posts");
-    if (!response.ok) {
-      setAuth(false);
-      setLoadingList(false);
-      return;
-    }
-
+    if (!response.ok) return setAuth(false);
     const data = await response.json();
     setPosts(data);
     setAuth(true);
-    setLoadingList(false);
-  };
+  }
 
   useEffect(() => {
     refreshAdmin();
   }, []);
 
-  const handleSave = async (status: PostStatus) => {
-    try {
-      setSaving(status);
-      setToast(null);
-
-      const payload = {
-        ...editing,
-        status
-      };
-
-      const method = editing.id ? "PATCH" : "POST";
-      const url = editing.id ? `/api/admin/posts/${editing.id}` : "/api/admin/posts";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "No se pudo guardar el post.");
-      }
-
-      const saved = await response.json();
-      setEditing(saved);
-      await refreshAdmin();
-      await onPublicDataChange();
-
-      setToast({
-        type: "success",
-        message: status === "PUBLISHED" ? "Post publicado correctamente." : "Borrador guardado correctamente.",
-        post: saved
-      });
-    } catch (error) {
-      setToast({ type: "error", message: (error as Error).message });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const handleUpload = async (file?: File | null) => {
-    if (!file) return;
-    try {
-      setUploading(true);
-      const dataUrl = await fileToDataUrl(file);
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, dataUrl })
-      });
-
-      if (!response.ok) throw new Error("No se pudo subir la imagen.");
-
-      const data = await response.json();
-      setEditing({ ...editing, coverImage: data.url });
-      setToast({ type: "success", message: "Imagen subida correctamente." });
-    } catch (error) {
-      setToast({ type: "error", message: (error as Error).message });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
-    setAuth(false);
-    setEditing(emptyPost);
-  };
-
   if (!auth) {
-    return <Login onSuccess={refreshAdmin} />;
+    return <Login onSuccess={() => refreshAdmin()} />;
   }
 
   return (
-    <section className="stack-md">
-      <div className="section-head">
-        <h1>Panel editorial</h1>
-        <button className="secondary" onClick={handleLogout}>Cerrar sesión</button>
-      </div>
-
-      {toast && (
-        <div className={`toast ${toast.type}`}>
-          <p>{toast.message}</p>
-          {toast.post && (
-            <div className="row-actions">
-              <button className="secondary" onClick={() => setEditing(toast.post)}>Seguir editando</button>
-              {toast.post.status === "PUBLISHED" && (
-                <button onClick={() => go(`/articulos/${toast.post?.slug}`)}>Ir al artículo publicado</button>
-              )}
-              <button className="secondary" onClick={() => setEditing(emptyPost)}>Crear nuevo post</button>
-            </div>
-          )}
-        </div>
-      )}
+    <section>
+      <h1>Panel editorial</h1>
+      <p className="muted">Crear, editar, guardar borrador, publicar o despublicar.</p>
 
       <div className="admin-layout">
-        <aside className="panel">
-          <div className="section-head compact">
-            <h3>Posts</h3>
-            <button className="secondary" onClick={() => setEditing(emptyPost)}>+ Nuevo</button>
-          </div>
-
-          {loadingList && <p className="muted">Cargando posts...</p>}
-
-          <div className="post-list">
-            {posts.map((post) => (
-              <button key={post.id} className="post-item" onClick={() => setEditing(post)}>
-                <span>{post.title}</span>
-                <small>{post.status}</small>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <div className="editor-shell">
-          <div className="panel">
-            <h3>{editing.id ? "Editar post" : "Nuevo post"}</h3>
-            <div className="form-grid">
-              <input placeholder="Título" value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
-              <input placeholder="Subtítulo" value={editing.subtitle ?? ""} onChange={(e) => setEditing({ ...editing, subtitle: e.target.value })} />
-              <input placeholder="Slug" value={editing.slug ?? ""} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
-              <input placeholder="Tags (coma separada)" value={editing.tags ?? ""} onChange={(e) => setEditing({ ...editing, tags: e.target.value })} />
-              <input type="number" placeholder="Semana" value={editing.weekNumber ?? 1} onChange={(e) => setEditing({ ...editing, weekNumber: Number(e.target.value) })} />
-              <input placeholder="URL imagen" value={editing.coverImage ?? ""} onChange={(e) => setEditing({ ...editing, coverImage: e.target.value })} />
-              <textarea placeholder="Idea clave" value={editing.keyIdea ?? ""} onChange={(e) => setEditing({ ...editing, keyIdea: e.target.value })} />
-              <textarea rows={10} placeholder="Contenido (usa ## para subtítulos)" value={editing.content ?? ""} onChange={(e) => setEditing({ ...editing, content: e.target.value })} />
-            </div>
-
-            <div className="row-actions">
-              <label className="file-input">
-                {uploading ? "Subiendo imagen..." : "Subir imagen"}
-                <input type="file" accept="image/*" onChange={(e) => handleUpload(e.target.files?.[0])} disabled={uploading} />
-              </label>
-              <button
-                className="secondary"
-                onClick={() => handleSave("DRAFT")}
-                disabled={saving !== null}
-              >
-                {saving === "DRAFT" ? "Guardando..." : "Guardar borrador"}
-              </button>
-              <button
-                onClick={() => handleSave("PUBLISHED")}
-                disabled={saving !== null}
-              >
-                {saving === "PUBLISHED" ? "Publicando..." : "Publicar"}
-              </button>
-              <button
-                className="secondary"
-                onClick={() => handleSave("DRAFT")}
-                disabled={saving !== null}
-              >
-                Despublicar
-              </button>
-            </div>
-          </div>
-
-          <div className="panel preview">
-            <h3>Vista previa</h3>
-            <p className="micro">Semana {editing.weekNumber ?? "-"}</p>
-            <h2>{editing.title || "Título del artículo"}</h2>
-            {editing.subtitle && <p className="article-subtitle">{editing.subtitle}</p>}
-            {editing.coverImage && <img src={editing.coverImage} alt="Vista previa" />}
-            <blockquote>{editing.keyIdea || "Idea clave del post"}</blockquote>
-            {(editing.content || "").split("\n\n").slice(0, 4).map((block, index) =>
-              block.startsWith("## ") ? <h4 key={index}>{block.slice(3)}</h4> : <p key={index}>{block || "Contenido del artículo..."}</p>
-            )}
-          </div>
+        <div className="card">
+          <h3>Posts</h3>
+          {posts.map((post) => (
+            <button key={post.id} className="row" onClick={() => setEditing(post)}>
+              <span>{post.title}</span>
+              <small>{post.status}</small>
+            </button>
+          ))}
+          <button onClick={() => setEditing(emptyPost)}>+ Nuevo post</button>
         </div>
+
+        <Editor
+          post={editing}
+          onChange={setEditing}
+          onSave={async (status) => {
+            const payload = { ...editing, status };
+            const method = editing.id ? "PATCH" : "POST";
+            const url = editing.id ? `/api/admin/posts/${editing.id}` : "/api/admin/posts";
+            await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            await refreshAdmin();
+            onUpdated();
+          }}
+        />
       </div>
     </section>
+  );
+}
+
+function Editor({
+  post,
+  onChange,
+  onSave
+}: {
+  post: Partial<Post>;
+  onChange: (post: Partial<Post>) => void;
+  onSave: (status: "DRAFT" | "PUBLISHED") => void;
+}) {
+  async function upload(file?: File | null) {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    const response = await fetch("/api/admin/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, dataUrl })
+    });
+    const data = await response.json();
+    onChange({ ...post, coverImage: data.url });
+  }
+
+  return (
+    <div className="card editor">
+      <h3>{post.id ? "Editar post" : "Nuevo post"}</h3>
+      <input placeholder="Título" value={post.title ?? ""} onChange={(e) => onChange({ ...post, title: e.target.value })} />
+      <input placeholder="Subtítulo" value={post.subtitle ?? ""} onChange={(e) => onChange({ ...post, subtitle: e.target.value })} />
+      <input placeholder="Slug" value={post.slug ?? ""} onChange={(e) => onChange({ ...post, slug: e.target.value })} />
+      <textarea placeholder="Idea clave" value={post.keyIdea ?? ""} onChange={(e) => onChange({ ...post, keyIdea: e.target.value })} />
+      <textarea rows={10} placeholder="Contenido (usa ## para subtítulos)" value={post.content ?? ""} onChange={(e) => onChange({ ...post, content: e.target.value })} />
+      <div className="row">
+        <input placeholder="Tags" value={post.tags ?? ""} onChange={(e) => onChange({ ...post, tags: e.target.value })} />
+        <input type="number" placeholder="Semana" value={post.weekNumber ?? 1} onChange={(e) => onChange({ ...post, weekNumber: Number(e.target.value) })} />
+      </div>
+      <input placeholder="URL imagen" value={post.coverImage ?? ""} onChange={(e) => onChange({ ...post, coverImage: e.target.value })} />
+      <input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} />
+      <div className="row">
+        <button onClick={() => onSave("DRAFT")}>Guardar borrador</button>
+        <button onClick={() => onSave("PUBLISHED")}>Publicar</button>
+      </div>
+    </div>
   );
 }
 
 function Login({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const submit = async () => {
-    setLoading(true);
-    setError("");
-
+  async function submit() {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
-
-    if (response.ok) {
-      onSuccess();
-    } else {
-      setError("Credenciales inválidas.");
-    }
-
-    setLoading(false);
-  };
+    if (response.ok) onSuccess();
+  }
 
   return (
-    <section className="login-card">
-      <h1>Acceso administrador</h1>
-      <p className="muted">Panel editorial privado de GEXPLO.</p>
+    <section className="card">
+      <h1>Acceso admin</h1>
       <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} />
-      {error && <p className="error-text">{error}</p>}
-      <button onClick={submit} disabled={loading}>{loading ? "Ingresando..." : "Iniciar sesión"}</button>
+      <button onClick={submit}>Iniciar sesión</button>
     </section>
   );
 }
@@ -448,10 +269,6 @@ function fileToDataUrl(file: File) {
     reader.onload = () => resolve(String(reader.result));
     reader.readAsDataURL(file);
   });
-}
-
-function splitTags(value: string) {
-  return value.split(",").map((tag) => tag.trim()).filter(Boolean);
 }
 
 function setMeta(name: string, content: string) {
