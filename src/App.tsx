@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-type PostStatus = "DRAFT" | "PUBLISHED";
-
 type Post = {
   id: number;
   title: string;
@@ -12,28 +10,20 @@ type Post = {
   coverImage: string;
   tags: string;
   weekNumber?: number;
-  status: PostStatus;
+  status: "DRAFT" | "PUBLISHED";
   publishedAt?: string;
 };
 
-type Toast = { type: "success" | "error"; message: string; post?: Post } | null;
+const intro = "Bitácora técnica de GEXPLO: transición desde consultoría ambiental e hidrogeológica hacia una operación geocientífica basada en datos, trazabilidad e IA aplicada.";
 
-const hero = {
-  label: "Bitácora del CEO",
-  title: "De consultora ambiental a empresa tecnológica basada en datos",
-  subtitle: "Documentación semanal de decisiones, aprendizajes y evolución real de GEXPLO",
-  kicker:
-    "Un registro editorial en tiempo real sobre cómo una práctica técnica de campo se convierte en una organización guiada por datos, trazabilidad e inteligencia aplicada."
-};
-
-const blankPost: Partial<Post> = {
+const emptyPost: Partial<Post> = {
   title: "",
   subtitle: "",
   slug: "",
   keyIdea: "",
   content: "",
   coverImage: "",
-  tags: "ambiente,agua,tierra",
+  tags: "ambiente,agua",
   weekNumber: 1,
   status: "DRAFT"
 };
@@ -42,435 +32,233 @@ export function App() {
   const [path, setPath] = useState(window.location.pathname);
   const [posts, setPosts] = useState([] as Post[]);
 
-  const refreshPublic = async () => {
-    const response = await fetch("/api/posts");
-    setPosts(await response.json());
-  };
-
   useEffect(() => {
-    refreshPublic();
-    const onPop = () => setPath(window.location.pathname);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    fetch("/api/posts").then((r) => r.json()).then(setPosts);
   }, []);
 
   const activeSlug = useMemo(() => path.match(/^\/articulos\/(.+)$/)?.[1], [path]);
-  const current = posts.find((post) => post.slug === activeSlug);
+  const current = posts.find((p) => p.slug === activeSlug);
 
   useEffect(() => {
-    if (current) {
-      document.title = `${current.title} | Blog GEXPLO`;
-      setMeta("description", current.keyIdea);
-    } else {
+    if (!current) {
       document.title = "Blog GEXPLO";
-      setMeta("description", hero.subtitle);
+      return;
     }
+    document.title = `${current.title} | Blog GEXPLO`;
+    setMeta("description", current.keyIdea);
   }, [current]);
 
-  const go = (to: string) => {
+  function go(to: string) {
     window.history.pushState({}, "", to);
     setPath(to);
-  };
+  }
 
   return (
     <div>
-      <SiteHeader go={go} />
+      <header className="header">
+        <div className="container nav">
+          <button className="brand" onClick={() => go("/")}>GEXPLO · Blog</button>
+          <nav>
+            <button onClick={() => go("/articulos")}>Artículos</button>
+            <button onClick={() => go("/sobre")}>Sobre este blog</button>
+            <button onClick={() => go("/admin")}>Admin</button>
+          </nav>
+        </div>
+      </header>
 
       <main className="container">
-        {path === "/" && <PublicHome posts={posts} go={go} />}
+        {path === "/" && <Home posts={posts} go={go} />}
         {path === "/articulos" && <Archive posts={posts} go={go} />}
-        {path.startsWith("/articulos/") && current && <ArticleView post={current} />}
-        {path === "/sobre" && <AboutView />}
-        {path === "/admin" && <AdminView go={go} onRefreshPublic={refreshPublic} />}
+        {path.startsWith("/articulos/") && current && <Article post={current} />}
+        {path === "/sobre" && <About />}
+        {path === "/admin" && <Admin onUpdated={() => fetch("/api/posts").then((r) => r.json()).then(setPosts)} />}
       </main>
     </div>
   );
 }
 
-function SiteHeader({ go }: { go: (path: string) => void }) {
-  const [logoHidden, setLogoHidden] = useState(false);
-
+function Home({ posts, go }: { posts: Post[]; go: (to: string) => void }) {
   return (
-    <header className="site-header">
-      <div className="container nav-shell">
-        <button className="brand" onClick={() => go("/") }>
-          {!logoHidden && (
-            <img
-              src="/logo.png"
-              alt="GEXPLO"
-              className="brand-logo"
-              onError={() => setLogoHidden(true)}
-            />
-          )}
-          <span className="brand-text">GEXPLO · Laboratorio Editorial</span>
-        </button>
-
-        <nav className="main-nav">
-          <button className="nav-link" onClick={() => go("/")}>Inicio</button>
-          <button className="nav-link" onClick={() => go("/articulos")}>Archivo</button>
-          <button className="nav-link" onClick={() => go("/sobre")}>Sobre este blog</button>
-          <button className="nav-link nav-link-cta" onClick={() => go("/admin")}>Admin</button>
-        </nav>
+    <section>
+      <div className="hero">
+        <p className="eyebrow">Ambiente · Agua · Tierra · IA & Blockchain</p>
+        <h1>Documentación semanal de la transformación de GEXPLO.</h1>
+        <p>{intro}</p>
       </div>
-    </header>
-  );
-}
-
-function PublicHome({ posts, go }: { posts: Post[]; go: (path: string) => void }) {
-  return (
-    <section className="stack-xl">
-      <div className="hero-shell">
-        <p className="badge">{hero.label}</p>
-        <h1>{hero.title}</h1>
-        <p className="hero-subtitle">{hero.subtitle}</p>
-        <p className="hero-kicker">{hero.kicker}</p>
-        <div className="hero-points">
-          <span>Ambiente</span>
-          <span>Agua</span>
-          <span>Tierra</span>
-          <span>IA & Blockchain</span>
-        </div>
-      </div>
-
-      <div className="section-title">
-        <h2>Ediciones recientes</h2>
-        <button className="ghost" onClick={() => go("/articulos")}>Ver archivo completo</button>
-      </div>
-
-      <div className="post-grid">
-        {posts.slice(0, 6).map((post) => (
-          <div key={post.id}><PostCard post={post} go={go} /></div>
-        ))}
-      </div>
+      <h2>Últimas ediciones</h2>
+      {posts.slice(0, 3).map((post) => (
+        <div key={post.id}><PostCard post={post} go={go} /></div>
+      ))}
     </section>
   );
 }
 
-function Archive({ posts, go }: { posts: Post[]; go: (path: string) => void }) {
+function Archive({ posts, go }: { posts: Post[]; go: (to: string) => void }) {
   return (
-    <section className="stack-lg">
-      <div className="archive-intro">
-        <h1>Archivo de transformación</h1>
-        <p>
-          Serie continua de decisiones y aprendizajes: cada semana documenta un paso concreto en la evolución de GEXPLO.
-        </p>
-      </div>
-
-      <div className="timeline-list">
-        {posts.map((post) => (
-          <article key={post.id} className="timeline-item">
-            <p className="week-pill">Semana {post.weekNumber ?? "-"}</p>
-            <div className="timeline-body">
-              <h3>{post.title}</h3>
-              <p>{post.keyIdea}</p>
-              <div className="chip-row">
-                {splitTags(post.tags).slice(0, 4).map((tag) => (
-                  <span key={tag} className="chip">{tag}</span>
-                ))}
-              </div>
-              <button onClick={() => go(`/articulos/${post.slug}`)}>Leer edición</button>
-            </div>
-          </article>
-        ))}
-      </div>
+    <section>
+      <h1>Archivo editorial</h1>
+      <p className="muted">Seguimiento de estrategia, operaciones y producto.</p>
+      {posts.map((post) => (
+        <div key={post.id}><PostCard post={post} go={go} /></div>
+      ))}
     </section>
   );
 }
 
-function PostCard({ post, go }: { post: Post; go: (path: string) => void }) {
+function PostCard({ post, go }: { post: Post; go: (to: string) => void }) {
   return (
-    <article className="post-card">
-      {post.coverImage ? (
-        <img src={post.coverImage} alt={post.title} className="post-cover" />
-      ) : (
-        <div className="cover-fallback">
-          <strong>GEXPLO</strong>
-          <small>Bitácora técnica</small>
-        </div>
-      )}
-      <div className="post-content">
-        <p className="overline">Semana {post.weekNumber ?? "-"}</p>
-        <h3>{post.title}</h3>
-        <p>{post.keyIdea}</p>
-        <div className="chip-row">
-          {splitTags(post.tags).slice(0, 3).map((tag) => (
-            <span key={tag} className="chip">{tag}</span>
-          ))}
-        </div>
-        <button onClick={() => go(`/articulos/${post.slug}`)}>Leer artículo</button>
-      </div>
+    <article className="card">
+      {post.coverImage && <img src={post.coverImage} alt={post.title} />}
+      <p className="muted">Semana {post.weekNumber ?? "-"}</p>
+      <h3>{post.title}</h3>
+      <p>{post.keyIdea}</p>
+      <button onClick={() => go(`/articulos/${post.slug}`)}>Leer artículo</button>
     </article>
   );
 }
 
-function ArticleView({ post }: { post: Post }) {
+function Article({ post }: { post: Post }) {
   return (
-    <article className="article-page">
-      <div className="article-meta">
-        <p className="week-pill inline">Semana {post.weekNumber ?? "-"}</p>
-      </div>
+    <article className="article">
       <h1>{post.title}</h1>
-      {post.subtitle && <p className="article-subtitle">{post.subtitle}</p>}
-
-      {post.coverImage ? (
-        <img src={post.coverImage} alt={post.title} className="article-cover" />
-      ) : (
-        <div className="cover-fallback article-fallback">Imagen destacada pendiente</div>
-      )}
-
+      {post.subtitle && <p className="muted">{post.subtitle}</p>}
+      {post.coverImage && <img src={post.coverImage} alt={post.title} />}
       <blockquote>{post.keyIdea}</blockquote>
-
-      <div className="article-content">
-        {post.content.split("\n\n").map((block, index) =>
-          block.startsWith("## ") ? <h2 key={index}>{block.slice(3)}</h2> : <p key={index}>{block}</p>
-        )}
-      </div>
-
-      <div className="chip-row">
-        {splitTags(post.tags).map((tag) => (
-          <span key={tag} className="chip">{tag}</span>
-        ))}
-      </div>
+      {post.content.split("\n\n").map((block, index) =>
+        block.startsWith("## ") ? <h2 key={index}>{block.slice(3)}</h2> : <p key={index}>{block}</p>
+      )}
+      <p className="muted">Tags: {post.tags}</p>
     </article>
   );
 }
 
-function AboutView() {
+function About() {
   return (
-    <section className="about-card stack-md">
+    <section>
       <h1>Sobre este blog</h1>
-      <p>{hero.title}</p>
-      <p>{hero.subtitle}</p>
-      <p>
-        Esta bitácora funciona como un laboratorio editorial: estrategia, operaciones y producto narrados con criterio técnico.
-      </p>
+      <p>{intro}</p>
+      <p>Este espacio editorial busca trazabilidad, criterio técnico y continuidad estratégica.</p>
     </section>
   );
 }
 
-function AdminView({
-  go,
-  onRefreshPublic
-}: {
-  go: (path: string) => void;
-  onRefreshPublic: () => Promise<void>;
-}) {
+function Admin({ onUpdated }: { onUpdated: () => void }) {
   const [auth, setAuth] = useState(false);
   const [posts, setPosts] = useState([] as Post[]);
-  const [editing, setEditing] = useState(blankPost as Partial<Post>);
-  const [listLoading, setListLoading] = useState(false);
-  const [saving, setSaving] = useState(null as PostStatus | null);
-  const [uploading, setUploading] = useState(false);
-  const [toast, setToast] = useState(null as Toast);
+  const [editing, setEditing] = useState(emptyPost as Partial<Post>);
 
-  const refresh = async () => {
-    setListLoading(true);
+  async function refreshAdmin() {
     const response = await fetch("/api/admin/posts");
-
-    if (!response.ok) {
-      setAuth(false);
-      setListLoading(false);
-      return;
-    }
-
-    setPosts(await response.json());
+    if (!response.ok) return setAuth(false);
+    const data = await response.json();
+    setPosts(data);
     setAuth(true);
-    setListLoading(false);
-  };
+  }
 
   useEffect(() => {
-    refresh();
+    refreshAdmin();
   }, []);
 
-  const savePost = async (status: PostStatus) => {
-    try {
-      setSaving(status);
-      setToast(null);
-
-      const endpoint = editing.id ? `/api/admin/posts/${editing.id}` : "/api/admin/posts";
-      const method = editing.id ? "PATCH" : "POST";
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...editing, status })
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || "No se pudo guardar.");
-      }
-
-      const saved = await response.json();
-      setEditing(saved);
-      await refresh();
-      await onRefreshPublic();
-
-      setToast({
-        type: "success",
-        message: status === "PUBLISHED" ? "Publicación realizada correctamente." : "Borrador guardado.",
-        post: saved
-      });
-    } catch (error) {
-      setToast({ type: "error", message: (error as Error).message });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const uploadCover = async (file?: File | null) => {
-    if (!file) return;
-    try {
-      setUploading(true);
-      const dataUrl = await fileToDataUrl(file);
-      const response = await fetch("/api/admin/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, dataUrl })
-      });
-      if (!response.ok) throw new Error("No se pudo subir la imagen.");
-      const data = await response.json();
-      setEditing({ ...editing, coverImage: data.url });
-      setToast({ type: "success", message: "Imagen destacada actualizada." });
-    } catch (error) {
-      setToast({ type: "error", message: (error as Error).message });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const logout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
-    setAuth(false);
-    setEditing(blankPost);
-  };
-
-  if (!auth) return <LoginView onSuccess={refresh} />;
+  if (!auth) {
+    return <Login onSuccess={() => refreshAdmin()} />;
+  }
 
   return (
-    <section className="stack-md">
-      <div className="section-title">
-        <h1>Panel editorial</h1>
-        <button className="ghost" onClick={logout}>Cerrar sesión</button>
-      </div>
+    <section>
+      <h1>Panel editorial</h1>
+      <p className="muted">Crear, editar, guardar borrador, publicar o despublicar.</p>
 
-      {toast && (
-        <div className={`alert ${toast.type}`}>
-          <p>{toast.message}</p>
-          {toast.post && (
-            <div className="actions-row">
-              <button className="ghost" onClick={() => setEditing(toast.post)}>Seguir editando</button>
-              {toast.post.status === "PUBLISHED" && (
-                <button onClick={() => go(`/articulos/${toast.post!.slug}`)}>Ir al artículo publicado</button>
-              )}
-              <button className="ghost" onClick={() => setEditing(blankPost)}>Crear nuevo post</button>
-            </div>
-          )}
+      <div className="admin-layout">
+        <div className="card">
+          <h3>Posts</h3>
+          {posts.map((post) => (
+            <button key={post.id} className="row" onClick={() => setEditing(post)}>
+              <span>{post.title}</span>
+              <small>{post.status}</small>
+            </button>
+          ))}
+          <button onClick={() => setEditing(emptyPost)}>+ Nuevo post</button>
         </div>
-      )}
 
-      <div className="admin-grid">
-        <aside className="panel">
-          <div className="section-title compact">
-            <h3>Entradas</h3>
-            <button className="ghost" onClick={() => setEditing(blankPost)}>+ Nuevo</button>
-          </div>
-
-          {listLoading && <p className="muted">Cargando publicaciones...</p>}
-
-          <div className="entry-list">
-            {posts.map((post) => (
-              <button key={post.id} className="entry-item" onClick={() => setEditing(post)}>
-                <strong>{post.title}</strong>
-                <small>{post.status}</small>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <div className="editor-grid">
-          <section className="panel">
-            <h3>{editing.id ? "Editar publicación" : "Nueva publicación"}</h3>
-
-            <div className="fields">
-              <input placeholder="Título" value={editing.title ?? ""} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
-              <input placeholder="Subtítulo" value={editing.subtitle ?? ""} onChange={(e) => setEditing({ ...editing, subtitle: e.target.value })} />
-              <input placeholder="Slug" value={editing.slug ?? ""} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} />
-              <input placeholder="Tags (coma separada)" value={editing.tags ?? ""} onChange={(e) => setEditing({ ...editing, tags: e.target.value })} />
-              <input type="number" placeholder="Semana" value={editing.weekNumber ?? 1} onChange={(e) => setEditing({ ...editing, weekNumber: Number(e.target.value) })} />
-              <input placeholder="URL imagen destacada" value={editing.coverImage ?? ""} onChange={(e) => setEditing({ ...editing, coverImage: e.target.value })} />
-              <textarea placeholder="Idea clave" value={editing.keyIdea ?? ""} onChange={(e) => setEditing({ ...editing, keyIdea: e.target.value })} />
-              <textarea rows={12} placeholder="Contenido (usar ## para subtítulos)" value={editing.content ?? ""} onChange={(e) => setEditing({ ...editing, content: e.target.value })} />
-            </div>
-
-            <div className="actions-row">
-              <label className="upload-btn">
-                {uploading ? "Subiendo..." : "Subir imagen"}
-                <input type="file" accept="image/*" onChange={(e) => uploadCover(e.target.files?.[0])} disabled={uploading} />
-              </label>
-              <button className="ghost" onClick={() => savePost("DRAFT")} disabled={saving !== null}>
-                {saving === "DRAFT" ? "Guardando..." : "Guardar borrador"}
-              </button>
-              <button className="primary" onClick={() => savePost("PUBLISHED")} disabled={saving !== null}>
-                {saving === "PUBLISHED" ? "Publicando..." : "Publicar"}
-              </button>
-              <button className="ghost" onClick={() => savePost("DRAFT")} disabled={saving !== null}>
-                Despublicar
-              </button>
-            </div>
-          </section>
-
-          <section className="panel preview-panel">
-            <h3>Vista previa editorial</h3>
-            <p className="week-pill inline">Semana {editing.weekNumber ?? "-"}</p>
-            <h2>{editing.title || "Título de artículo"}</h2>
-            {editing.subtitle && <p className="article-subtitle">{editing.subtitle}</p>}
-            {editing.coverImage ? (
-              <img src={editing.coverImage} alt="preview" className="article-cover" />
-            ) : (
-              <div className="cover-fallback article-fallback">Sin imagen destacada</div>
-            )}
-            <blockquote>{editing.keyIdea || "Idea clave del artículo"}</blockquote>
-            {(editing.content || "").split("\n\n").slice(0, 4).map((block, idx) =>
-              block.startsWith("## ") ? <h4 key={idx}>{block.slice(3)}</h4> : <p key={idx}>{block || "Contenido en construcción..."}</p>
-            )}
-          </section>
-        </div>
+        <Editor
+          post={editing}
+          onChange={setEditing}
+          onSave={async (status) => {
+            const payload = { ...editing, status };
+            const method = editing.id ? "PATCH" : "POST";
+            const url = editing.id ? `/api/admin/posts/${editing.id}` : "/api/admin/posts";
+            await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            await refreshAdmin();
+            onUpdated();
+          }}
+        />
       </div>
     </section>
   );
 }
 
-function LoginView({ onSuccess }: { onSuccess: () => void }) {
+function Editor({
+  post,
+  onChange,
+  onSave
+}: {
+  post: Partial<Post>;
+  onChange: (post: Partial<Post>) => void;
+  onSave: (status: "DRAFT" | "PUBLISHED") => void;
+}) {
+  async function upload(file?: File | null) {
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    const response = await fetch("/api/admin/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, dataUrl })
+    });
+    const data = await response.json();
+    onChange({ ...post, coverImage: data.url });
+  }
+
+  return (
+    <div className="card editor">
+      <h3>{post.id ? "Editar post" : "Nuevo post"}</h3>
+      <input placeholder="Título" value={post.title ?? ""} onChange={(e) => onChange({ ...post, title: e.target.value })} />
+      <input placeholder="Subtítulo" value={post.subtitle ?? ""} onChange={(e) => onChange({ ...post, subtitle: e.target.value })} />
+      <input placeholder="Slug" value={post.slug ?? ""} onChange={(e) => onChange({ ...post, slug: e.target.value })} />
+      <textarea placeholder="Idea clave" value={post.keyIdea ?? ""} onChange={(e) => onChange({ ...post, keyIdea: e.target.value })} />
+      <textarea rows={10} placeholder="Contenido (usa ## para subtítulos)" value={post.content ?? ""} onChange={(e) => onChange({ ...post, content: e.target.value })} />
+      <div className="row">
+        <input placeholder="Tags" value={post.tags ?? ""} onChange={(e) => onChange({ ...post, tags: e.target.value })} />
+        <input type="number" placeholder="Semana" value={post.weekNumber ?? 1} onChange={(e) => onChange({ ...post, weekNumber: Number(e.target.value) })} />
+      </div>
+      <input placeholder="URL imagen" value={post.coverImage ?? ""} onChange={(e) => onChange({ ...post, coverImage: e.target.value })} />
+      <input type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0])} />
+      <div className="row">
+        <button onClick={() => onSave("DRAFT")}>Guardar borrador</button>
+        <button onClick={() => onSave("PUBLISHED")}>Publicar</button>
+      </div>
+    </div>
+  );
+}
+
+function Login({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const login = async () => {
-    setLoading(true);
-    setError("");
-
+  async function submit() {
     const response = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
-
     if (response.ok) onSuccess();
-    else setError("Credenciales inválidas.");
-
-    setLoading(false);
-  };
+  }
 
   return (
-    <section className="login-shell">
-      <h1>Acceso administrador</h1>
-      <p className="muted">Entrada segura al panel editorial de GEXPLO.</p>
+    <section className="card">
+      <h1>Acceso admin</h1>
       <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} />
-      {error && <p className="error-text">{error}</p>}
-      <button onClick={login} disabled={loading}>{loading ? "Ingresando..." : "Iniciar sesión"}</button>
+      <button onClick={submit}>Iniciar sesión</button>
     </section>
   );
 }
@@ -481,10 +269,6 @@ function fileToDataUrl(file: File) {
     reader.onload = () => resolve(String(reader.result));
     reader.readAsDataURL(file);
   });
-}
-
-function splitTags(raw: string) {
-  return raw.split(",").map((tag) => tag.trim()).filter(Boolean);
 }
 
 function setMeta(name: string, content: string) {
